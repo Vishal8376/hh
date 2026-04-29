@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anomaly Detection — TrustVault</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/anomaly.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="particles"></div>
+  <nav class="nav"><a href="index.html" class="nav__brand"><i data-lucide="shield-check"></i> TrustVault</a><button class="nav__toggle" aria-label="Menu"><i data-lucide="menu"></i></button><ul class="nav__links"><li><a href="index.html" class="nav__link">Home</a></li><li><a href="verify.html" class="nav__link">Verify</a></li><li><a href="wallet.html" class="nav__link">Wallet</a></li><li><a href="consent.html" class="nav__link">Consent</a></li><li><a href="anomaly.html" class="nav__link active">Anomaly</a></li></ul></nav>
+
+  <main class="page container">
+    <h1 class="section__title anim-fade-in-up">Anomaly Detection Dashboard</h1>
+    <p class="section__subtitle anim-fade-in-up">Real-time monitoring of threats, deepfake attempts, and synthetic identity patterns.</p>
+
+    <!-- Stats -->
+    <div class="dashboard-grid anim-fade-in-up">
+      <div class="dash-stat"><div class="dash-stat__label">Verifications (24h)</div><div class="dash-stat__value" id="stat-total" style="color:var(--accent-blue);">—</div></div>
+      <div class="dash-stat"><div class="dash-stat__label">Flagged</div><div class="dash-stat__value" id="stat-flagged" style="color:var(--accent-orange);">—</div></div>
+      <div class="dash-stat"><div class="dash-stat__label">Blocked</div><div class="dash-stat__value" id="stat-blocked" style="color:var(--accent-red);">—</div></div>
+      <div class="dash-stat"><div class="dash-stat__label">Pass Rate</div><div class="dash-stat__value" id="stat-pass" style="color:var(--accent-green);">—</div></div>
+    </div>
+
+    <div class="grid grid--2 anim-fade-in-up" style="margin-bottom:var(--space-xl);">
+      <!-- Chart -->
+      <div class="card card--flat">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:var(--space-md);">Verification Activity (24h)</h2>
+        <div class="chart-container"><canvas id="main-chart"></canvas></div>
+      </div>
+      <!-- Risk Gauge + Threats -->
+      <div class="card card--flat">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:var(--space-md);">Avg Risk Score</h2>
+        <div class="risk-gauge-large" style="margin-bottom:var(--space-xl);">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="12"/>
+            <circle id="risk-gauge-circle" cx="100" cy="100" r="80" fill="none" stroke="#10b981" stroke-width="12" stroke-linecap="round" stroke-dasharray="502" stroke-dashoffset="502"/>
+          </svg>
+          <div class="risk-gauge-large__value"><span class="risk-gauge-large__number" id="risk-gauge-value">—</span><span class="risk-gauge-large__label">Average Risk</span></div>
+        </div>
+        <h3 style="font-size:1rem;font-weight:600;margin-bottom:var(--space-md);">Threat Distribution</h3>
+        <div id="threat-bars"></div>
+      </div>
+    </div>
+
+    <!-- Alert Feed -->
+    <div class="section anim-fade-in-up">
+      <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:var(--space-lg);">Recent Alerts</h2>
+      <div id="alert-feed" class="alert-feed"></div>
+    </div>
+  </main>
+
+  <div class="a11y-toolbar"></div>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/accessibility.js"></script>
+  <script src="js/anomaly.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrustVault — User-Controlled Financial Identity Verification</title>
+  <meta name="description" content="Portable, tamper-proof identity credentials with deepfake detection, ZKP selective disclosure, and real-time anomaly detection for regulated financial services.">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    .hero{min-height:92vh;display:flex;align-items:center;position:relative;overflow:hidden;background:var(--gradient-hero)}
+    .hero__bg{position:absolute;inset:0;background:radial-gradient(ellipse at 30% 20%,rgba(59,130,246,.12) 0%,transparent 60%),radial-gradient(ellipse at 70% 80%,rgba(139,92,246,.1) 0%,transparent 50%)}
+    .hero__content{position:relative;z-index:1;max-width:720px}
+    .hero__badge{display:inline-flex;align-items:center;gap:var(--space-sm);padding:6px 16px;border-radius:var(--radius-full);background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);font-size:.8rem;color:var(--accent-blue);margin-bottom:var(--space-xl);font-weight:500}
+    .hero__title{font-size:clamp(2.2rem,5vw,3.5rem);font-weight:900;line-height:1.1;margin-bottom:var(--space-lg);letter-spacing:-.02em}
+    .hero__title span{background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .hero__desc{font-size:1.125rem;color:var(--text-secondary);margin-bottom:var(--space-2xl);max-width:560px;line-height:1.7}
+    .hero__actions{display:flex;gap:var(--space-md);flex-wrap:wrap}
+    .hero__visual{position:absolute;right:-5%;top:50%;transform:translateY(-50%);width:45%;max-width:520px;opacity:.15;pointer-events:none}
+
+    .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--space-lg)}
+    .feature{padding:var(--space-xl);border-radius:var(--radius-lg);background:var(--bg-glass);border:1px solid var(--border-color);transition:all var(--transition-base)}
+    .feature:hover{border-color:var(--border-glow);transform:translateY(-4px);box-shadow:var(--shadow-glow)}
+    .feature__icon{width:52px;height:52px;border-radius:var(--radius-md);display:grid;place-items:center;margin-bottom:var(--space-lg);font-size:1.5rem}
+    .feature__title{font-size:1.0625rem;font-weight:700;margin-bottom:var(--space-sm)}
+    .feature__desc{font-size:.875rem;color:var(--text-secondary);line-height:1.6}
+
+    .arch-diagram{background:var(--bg-glass);border:1px solid var(--border-color);border-radius:var(--radius-xl);padding:var(--space-2xl);text-align:center}
+    .arch-flow{display:flex;align-items:center;justify-content:center;gap:var(--space-lg);flex-wrap:wrap;margin:var(--space-xl) 0}
+    .arch-node{padding:var(--space-md) var(--space-xl);border-radius:var(--radius-md);border:1px solid var(--border-color);background:var(--bg-card);min-width:140px;transition:all var(--transition-base)}
+    .arch-node:hover{border-color:var(--accent-blue);box-shadow:var(--shadow-glow)}
+    .arch-node__title{font-weight:700;font-size:.9375rem;margin-bottom:var(--space-xs)}
+    .arch-node__sub{font-size:.75rem;color:var(--text-muted)}
+    .arch-arrow{color:var(--accent-blue);font-size:1.5rem}
+
+    .cta-section{text-align:center;padding:var(--space-3xl) 0;background:radial-gradient(ellipse at center,rgba(59,130,246,.08),transparent 70%);border-radius:var(--radius-xl);margin-top:var(--space-3xl)}
+    .cta-section h2{font-size:2rem;font-weight:800;margin-bottom:var(--space-md)}
+    .cta-section p{color:var(--text-secondary);margin-bottom:var(--space-xl);max-width:480px;margin-left:auto;margin-right:auto}
+  </style>
+</head>
+<body>
+  <div class="particles"></div>
+
+  <nav class="nav" role="navigation">
+    <a href="index.html" class="nav__brand"><i data-lucide="shield-check"></i> TrustVault</a>
+    <button class="nav__toggle" aria-label="Menu"><i data-lucide="menu"></i></button>
+    <ul class="nav__links">
+      <li><a href="index.html" class="nav__link active">Home</a></li>
+      <li><a href="verify.html" class="nav__link">Verify</a></li>
+      <li><a href="wallet.html" class="nav__link">Wallet</a></li>
+      <li><a href="consent.html" class="nav__link">Consent</a></li>
+      <li><a href="anomaly.html" class="nav__link">Anomaly</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <div class="hero__bg"></div>
+      <div class="container hero__content anim-fade-in-up">
+        <div class="hero__badge"><i data-lucide="shield" style="width:14px;height:14px"></i> RBI-Aligned Identity Infrastructure</div>
+        <h1 class="hero__title">Own Your <span>Financial Identity.</span> Share It On <span>Your Terms.</span></h1>
+        <p class="hero__desc">Portable, tamper-proof verified credentials with AI-powered deepfake detection, zero-knowledge selective disclosure, and real-time anomaly defense — built for India's regulated financial ecosystem.</p>
+        <div class="hero__actions">
+          <a href="verify.html" class="btn btn--primary btn--lg"><i data-lucide="scan-face"></i> Start Verification</a>
+          <a href="wallet.html" class="btn btn--secondary btn--lg"><i data-lucide="wallet"></i> View Wallet</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section" style="margin-top:var(--space-3xl);">
+      <div style="text-align:center;margin-bottom:var(--space-2xl);" class="reveal">
+        <h2 class="section__title" style="font-size:2rem;">The Problem We Solve</h2>
+        <p class="section__subtitle" style="max-width:600px;margin:var(--space-sm) auto 0;">Financial services face three escalating threats that traditional KYC cannot address.</p>
+      </div>
+      <div class="grid grid--3 reveal">
+        <div class="card" style="border-left:3px solid var(--accent-red);">
+          <div style="font-size:2rem;margin-bottom:var(--space-md);">🎭</div>
+          <h3 style="font-size:1rem;margin-bottom:var(--space-sm);">Deepfake Impersonation</h3>
+          <p style="font-size:.875rem;color:var(--text-secondary);">AI-generated faces and voice clones bypass traditional video KYC, enabling fraudulent account creation at scale.</p>
+        </div>
+        <div class="card" style="border-left:3px solid var(--accent-orange);">
+          <div style="font-size:2rem;margin-bottom:var(--space-md);">🧬</div>
+          <h3 style="font-size:1rem;margin-bottom:var(--space-sm);">Synthetic Identity Fraud</h3>
+          <p style="font-size:.875rem;color:var(--text-secondary);">Combining real and fake PII creates synthetic identities that evade detection and build genuine-looking credit histories.</p>
+        </div>
+        <div class="card" style="border-left:3px solid var(--accent-purple);">
+          <div style="font-size:2rem;margin-bottom:var(--space-md);">🔑</div>
+          <h3 style="font-size:1rem;margin-bottom:var(--space-sm);">Credential Theft & Reuse</h3>
+          <p style="font-size:.875rem;color:var(--text-secondary);">Stolen KYC data is traded on dark markets, enabling unauthorized account access across multiple institutions.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section">
+      <div style="text-align:center;margin-bottom:var(--space-2xl);" class="reveal">
+        <h2 class="section__title" style="font-size:2rem;">Our Solution</h2>
+        <p class="section__subtitle" style="max-width:600px;margin:var(--space-sm) auto 0;">Five integrated capabilities that put users in control.</p>
+      </div>
+      <div class="features reveal">
+        <div class="feature">
+          <div class="feature__icon" style="background:rgba(239,68,68,.12);color:var(--accent-red);"><i data-lucide="scan-face"></i></div>
+          <div class="feature__title">Deepfake Detection</div>
+          <div class="feature__desc">Multi-layer AI analysis detects GAN-generated faces, injection attacks, and biometric spoofing during video KYC with 8-point verification.</div>
+        </div>
+        <div class="feature">
+          <div class="feature__icon" style="background:rgba(59,130,246,.12);color:var(--accent-blue);"><i data-lucide="wallet"></i></div>
+          <div class="feature__title">Portable Credentials</div>
+          <div class="feature__desc">Tamper-proof verifiable credentials aligned with DigiLocker & W3C VC standards. Verify once, use everywhere across regulated entities.</div>
+        </div>
+        <div class="feature">
+          <div class="feature__icon" style="background:rgba(16,185,129,.12);color:var(--accent-green);"><i data-lucide="lock"></i></div>
+          <div class="feature__title">ZKP Selective Disclosure</div>
+          <div class="feature__desc">Prove identity attributes without exposing raw PII. Share "age ≥ 18" without revealing your date of birth using zero-knowledge proofs.</div>
+        </div>
+        <div class="feature">
+          <div class="feature__icon" style="background:rgba(139,92,246,.12);color:var(--accent-purple);"><i data-lucide="activity"></i></div>
+          <div class="feature__title">Anomaly Detection</div>
+          <div class="feature__desc">Real-time behavioral analysis flags synthetic identity patterns, impossible travel, velocity violations, and device spoofing.</div>
+        </div>
+        <div class="feature">
+          <div class="feature__icon" style="background:rgba(6,182,212,.12);color:var(--accent-cyan);"><i data-lucide="accessibility"></i></div>
+          <div class="feature__title">Inclusive Access</div>
+          <div class="feature__desc">High-contrast, large text, voice guidance, and low-bandwidth modes ensure accessibility across all contexts per RBI's financial inclusion mandate.</div>
+        </div>
+        <div class="feature">
+          <div class="feature__icon" style="background:rgba(245,158,11,.12);color:var(--accent-orange);"><i data-lucide="file-check"></i></div>
+          <div class="feature__title">Consent & Audit</div>
+          <div class="feature__desc">Full audit trail of every consent action. Grant, revoke, and track exactly who accessed your identity data, aligned with Account Aggregator framework.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section reveal">
+      <div class="arch-diagram">
+        <h2 class="section__title">How It Works</h2>
+        <div class="arch-flow">
+          <div class="arch-node"><div class="arch-node__title">📄 Document</div><div class="arch-node__sub">Upload & OCR</div></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node"><div class="arch-node__title">📷 Liveness</div><div class="arch-node__sub">Webcam + Challenges</div></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node"><div class="arch-node__title">🛡️ Deepfake Check</div><div class="arch-node__sub">8-Point AI Analysis</div></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node"><div class="arch-node__title">✅ Credential</div><div class="arch-node__sub">Issued to Wallet</div></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-node"><div class="arch-node__title">🔐 ZKP Share</div><div class="arch-node__sub">Selective Disclosure</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container cta-section reveal">
+      <h2>Ready to Take Control?</h2>
+      <p>Start your identity verification now and receive your portable, tamper-proof credential.</p>
+      <a href="verify.html" class="btn btn--primary btn--lg"><i data-lucide="arrow-right"></i> Begin Verification</a>
+    </section>
+  </main>
+
+  <div class="a11y-toolbar"></div>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/accessibility.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

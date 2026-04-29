@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Identity — TrustVault</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/verify.css">
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="particles"></div>
+  <nav class="nav"><a href="index.html" class="nav__brand"><i data-lucide="shield-check"></i> TrustVault</a><button class="nav__toggle" aria-label="Menu"><i data-lucide="menu"></i></button><ul class="nav__links"><li><a href="index.html" class="nav__link">Home</a></li><li><a href="verify.html" class="nav__link active">Verify</a></li><li><a href="wallet.html" class="nav__link">Wallet</a></li><li><a href="consent.html" class="nav__link">Consent</a></li><li><a href="anomaly.html" class="nav__link">Anomaly</a></li></ul></nav>
+
+  <main class="page container">
+    <h1 class="section__title anim-fade-in-up">Identity Verification</h1>
+    <p class="section__subtitle anim-fade-in-up">Complete the multi-step verification to receive your portable credential.</p>
+
+    <!-- Stepper -->
+    <div class="stepper anim-fade-in-up">
+      <div class="step active" id="stepper-0"><span class="step__number">1</span> Document</div><div class="step__connector"></div>
+      <div class="step" id="stepper-1"><span class="step__number">2</span> Liveness</div><div class="step__connector"></div>
+      <div class="step" id="stepper-2"><span class="step__number">3</span> Deepfake</div><div class="step__connector"></div>
+      <div class="step" id="stepper-3"><span class="step__number">4</span> Result</div>
+    </div>
+
+    <!-- Step 1: Document -->
+    <div id="step-document" class="anim-fade-in-up">
+      <div class="card card--flat">
+        <h2 style="font-size:1.25rem;margin-bottom:var(--space-lg);">Upload Identity Document</h2>
+        <div style="margin-bottom:var(--space-lg);">
+          <label style="display:block;font-size:.875rem;color:var(--text-secondary);margin-bottom:var(--space-sm);">Document Type</label>
+          <select id="doc-type" style="width:100%;max-width:320px;padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font-sans);font-size:.875rem;">
+            <option value="aadhaar">Aadhaar Card</option>
+            <option value="pan">PAN Card</option>
+            <option value="passport">Passport</option>
+            <option value="voter_id">Voter ID</option>
+          </select>
+        </div>
+        
+        <div class="doc-upload" id="drop-zone" onclick="document.getElementById('doc-file').click()" style="cursor:pointer;">
+          <input type="file" id="doc-file" style="display:none" accept="image/*" onchange="handleFileUpload(event)">
+          <div class="doc-upload__icon"><i data-lucide="upload-cloud"></i></div>
+          <div class="doc-upload__text" id="upload-text"><strong>Click to upload</strong> or drag and drop<br><span style="font-size:.75rem;color:var(--text-muted);">Real OCR Analysis — PNG, JPG up to 5MB</span></div>
+          <img id="doc-preview" style="display:none; max-width:100%; max-height:200px; margin:var(--space-md) auto 0; border-radius:var(--radius-sm);" />
+        </div>
+
+        <!-- Extracted Data Form -->
+        <div id="ocr-form" style="display:none; margin-top:var(--space-lg); text-align:left;">
+          <h3 style="font-size:1rem;margin-bottom:var(--space-md);color:var(--accent-blue);">Extracted Data (Edit if incorrect)</h3>
+          <div class="grid grid--2" style="gap:var(--space-md);margin-bottom:var(--space-md);">
+            <div>
+              <label style="display:block;font-size:.875rem;color:var(--text-secondary);margin-bottom:var(--space-xs);">Full Name</label>
+              <input type="text" id="extr-name" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);">
+            </div>
+            <div>
+              <label style="display:block;font-size:.875rem;color:var(--text-secondary);margin-bottom:var(--space-xs);">Date of Birth (YYYY-MM-DD)</label>
+              <input type="text" id="extr-dob" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);">
+            </div>
+          </div>
+          <div style="margin-bottom:var(--space-md);">
+            <label style="display:block;font-size:.875rem;color:var(--text-secondary);margin-bottom:var(--space-xs);">Document Number</label>
+            <input type="text" id="extr-num" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);">
+          </div>
+        </div>
+
+        <div style="margin-top:var(--space-lg);display:flex;gap:var(--space-md);">
+          <button id="btn-upload" class="btn btn--primary" onclick="runDocumentOCR()"><i data-lucide="scan-line"></i> Run OCR Analysis</button>
+          <button id="btn-submit-doc" class="btn btn--primary" style="display:none;" onclick="submitDocument()"><i data-lucide="check-circle"></i> Confirm & Verify</button>
+          <button id="btn-next-liveness" class="btn btn--success" style="display:none;" onclick="startLiveness()"><i data-lucide="arrow-right"></i> Next: Liveness Check</button>
+        </div>
+        
+        <div id="doc-result"></div>
+      </div>
+    </div>
+
+    <!-- Step 2: Liveness -->
+    <div id="step-liveness" style="display:none;">
+      <div class="card card--flat">
+        <h2 style="font-size:1.25rem;margin-bottom:var(--space-lg);">Liveness Verification</h2>
+        <p style="color:var(--text-secondary);margin-bottom:var(--space-lg);font-size:.875rem;">Position your face within the oval and follow the on-screen challenges.</p>
+        <div class="verify-camera">
+          <video id="live-video" autoplay playsinline muted></video>
+          <canvas id="live-canvas"></canvas>
+          <div class="camera-overlay"><div class="face-guide"></div><div class="scan-line"></div></div>
+          <div class="camera-status"><span class="status-dot status-dot--green"></span> <span id="camera-status-text">Initializing camera...</span></div>
+        </div>
+        <div class="liveness-challenges">
+          <div class="challenge-card" id="challenge-blink"><div class="challenge-card__icon">👁️</div><div class="challenge-card__title">Blink Detection</div><div class="challenge-card__status">Waiting...</div></div>
+          <div class="challenge-card" id="challenge-turn"><div class="challenge-card__icon">↩️</div><div class="challenge-card__title">Head Turn</div><div class="challenge-card__status">Waiting...</div></div>
+          <div class="challenge-card" id="challenge-smile"><div class="challenge-card__icon">😊</div><div class="challenge-card__title">Smile</div><div class="challenge-card__status">Waiting...</div></div>
+        </div>
+        <div id="liveness-result"></div>
+        <button id="btn-next-deepfake" class="btn btn--success" style="display:none;margin-top:var(--space-lg);" onclick="startDeepfakeAnalysis()"><i data-lucide="arrow-right"></i> Next: Deepfake Analysis</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Deepfake -->
+    <div id="step-deepfake" style="display:none;">
+      <div class="card card--flat">
+        <h2 style="font-size:1.25rem;margin-bottom:var(--space-lg);">Deepfake Analysis</h2>
+        <div class="grid grid--2" style="gap:var(--space-2xl);">
+          <div>
+            <div class="score-gauge">
+              <svg width="140" height="140" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="8"/>
+                <circle id="gauge-circle" cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="8" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="283"/>
+              </svg>
+              <div class="score-gauge__value" id="gauge-value">—</div>
+            </div>
+            <div class="score-gauge__label">Authenticity Score</div>
+          </div>
+          <div>
+            <h3 style="font-size:1rem;margin-bottom:var(--space-md);">Detection Checks</h3>
+            <div id="deepfake-checks" class="check-list"></div>
+          </div>
+        </div>
+        <div id="deepfake-recommendation"></div>
+        <button id="btn-next-result" class="btn btn--success" style="display:none;margin-top:var(--space-lg);" onclick="showResult()"><i data-lucide="arrow-right"></i> Issue Credential</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Result -->
+    <div id="step-result" style="display:none;">
+      <div id="result-container"></div>
+    </div>
+  </main>
+
+  <div class="a11y-toolbar"></div>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/accessibility.js"></script>
+  <script src="js/verify.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

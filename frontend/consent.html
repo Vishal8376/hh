@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consent & ZKP Sharing — TrustVault</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/consent.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="particles"></div>
+  <nav class="nav"><a href="index.html" class="nav__brand"><i data-lucide="shield-check"></i> TrustVault</a><button class="nav__toggle" aria-label="Menu"><i data-lucide="menu"></i></button><ul class="nav__links"><li><a href="index.html" class="nav__link">Home</a></li><li><a href="verify.html" class="nav__link">Verify</a></li><li><a href="wallet.html" class="nav__link">Wallet</a></li><li><a href="consent.html" class="nav__link active">Consent</a></li><li><a href="anomaly.html" class="nav__link">Anomaly</a></li></ul></nav>
+
+  <main class="page container">
+    <h1 class="section__title anim-fade-in-up">Consent & Selective Disclosure</h1>
+    <p class="section__subtitle anim-fade-in-up">Control who accesses your identity data. Share only what's needed using Zero-Knowledge Proofs.</p>
+
+    <!-- Active Consents -->
+    <div class="section anim-fade-in-up">
+      <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:var(--space-lg);">Active Consents</h2>
+      <div id="active-consents" class="consent-grid"></div>
+    </div>
+
+    <!-- Share New -->
+    <div class="section anim-fade-in-up">
+      <div class="card">
+        <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:var(--space-lg);"><i data-lucide="share-2" style="display:inline;vertical-align:middle;margin-right:8px;color:var(--accent-blue);"></i>Share Credential with Institution</h2>
+        <div class="grid grid--2" style="margin-bottom:var(--space-lg);">
+          <div>
+            <label style="display:block;font-size:.875rem;color:var(--text-secondary);margin-bottom:var(--space-sm);">Institution</label>
+            <select id="inst-select" style="width:100%;padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font-sans);font-size:.875rem;">
+              <option value="">Loading...</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:.875rem;color:var(--text-secondary);margin-bottom:var(--space-sm);">Credential</label>
+            <select id="cred-select" style="width:100%;padding:10px 14px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);font-family:var(--font-sans);font-size:.875rem;">
+              <option value="">Loading...</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn--primary" onclick="openShareFlow()"><i data-lucide="settings-2"></i> Configure Sharing</button>
+
+        <div id="share-flow" style="display:none;margin-top:var(--space-xl);">
+          <h3 style="font-size:1rem;margin-bottom:var(--space-md);">Select Attributes to Disclose</h3>
+          <p style="font-size:.8125rem;color:var(--text-muted);margin-bottom:var(--space-md);">Unchecked attributes will be proven via Zero-Knowledge Proof without revealing the actual value.</p>
+          <div id="attr-list" class="attr-list"></div>
+          <button id="btn-share" class="btn btn--success" style="margin-top:var(--space-lg);" onclick="executeShare()"><i data-lucide="lock"></i> Generate ZKP & Share</button>
+          <div id="zkp-result"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Log -->
+    <div class="section anim-fade-in-up">
+      <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:var(--space-lg);">Consent Audit Trail</h2>
+      <div class="card card--flat">
+        <div id="audit-log" class="audit-timeline"></div>
+      </div>
+    </div>
+  </main>
+
+  <div class="a11y-toolbar"></div>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/accessibility.js"></script>
+  <script src="js/consent.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

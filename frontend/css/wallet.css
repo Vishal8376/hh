@@ -1,0 +1,24 @@
+/* Wallet Page Styles */
+.wallet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-xl); flex-wrap: wrap; gap: var(--space-md); }
+.wallet-user { display: flex; align-items: center; gap: var(--space-md); }
+.wallet-avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--gradient-primary); display: grid; place-items: center; font-size: 1.5rem; font-weight: 700; color: white; }
+
+.cred-card { position: relative; border-radius: var(--radius-lg); padding: var(--space-xl); overflow: hidden; transition: all var(--transition-base); cursor: pointer; min-height: 200px; display: flex; flex-direction: column; }
+.cred-card::before { content: ''; position: absolute; inset: 0; opacity: 0.12; }
+.cred-card__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-lg); position: relative; z-index: 1; }
+.cred-card__icon { width: 44px; height: 44px; border-radius: var(--radius-sm); background: rgba(255,255,255,.12); display: grid; place-items: center; font-size: 1.25rem; }
+.cred-card__issuer { font-size: 0.75rem; color: rgba(255,255,255,.7); }
+.cred-card__body { flex: 1; position: relative; z-index: 1; }
+.cred-card__type { font-size: 1.125rem; font-weight: 700; margin-bottom: var(--space-xs); }
+.cred-card__hash { font-family: var(--font-mono); font-size: 0.7rem; color: rgba(255,255,255,.5); word-break: break-all; }
+.cred-card__footer { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-md); position: relative; z-index: 1; font-size: 0.75rem; color: rgba(255,255,255,.6); }
+.cred-card__level { padding: 2px 8px; border-radius: var(--radius-full); background: rgba(255,255,255,.15); font-weight: 600; }
+.cred-card:hover { transform: translateY(-4px) scale(1.01); box-shadow: var(--shadow-lg); }
+
+.cred-detail { display: grid; gap: var(--space-sm); }
+.cred-detail__row { display: flex; justify-content: space-between; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-color); font-size: 0.875rem; }
+.cred-detail__label { color: var(--text-muted); }
+.cred-detail__value { font-weight: 500; font-family: var(--font-mono); font-size: 0.8125rem; }
+
+.qr-container { text-align: center; padding: var(--space-xl); }
+.qr-code { width: 200px; height: 200px; margin: 0 auto var(--space-md); background: white; border-radius: var(--radius-md); padding: var(--space-md); }
