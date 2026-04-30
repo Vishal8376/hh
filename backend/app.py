@@ -19,6 +19,7 @@ from routes.identity import identity_bp
 from routes.credentials import credentials_bp
 from routes.consent import consent_bp
 from routes.anomaly import anomaly_bp
+from routes.auth_2fa import auth_2fa_bp
 
 app = Flask(__name__, static_folder=None)
 CORS(app)
@@ -28,6 +29,7 @@ app.register_blueprint(identity_bp)
 app.register_blueprint(credentials_bp)
 app.register_blueprint(consent_bp)
 app.register_blueprint(anomaly_bp)
+app.register_blueprint(auth_2fa_bp)
 
 # Serve frontend static files
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
@@ -35,7 +37,7 @@ FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fronten
 
 @app.route("/")
 def index():
-    return send_from_directory(FRONTEND_DIR, "index.html")
+    return send_from_directory(FRONTEND_DIR, "login.html")
 
 
 @app.route("/<path:filename>")

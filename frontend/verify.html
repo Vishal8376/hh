@@ -9,6 +9,10 @@
   <link rel="stylesheet" href="css/verify.css">
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- MediaPipe Hands for Gesture Auth (Step 3) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 </head>
 <body>
   <div class="particles"></div>
@@ -18,12 +22,13 @@
     <h1 class="section__title anim-fade-in-up">Identity Verification</h1>
     <p class="section__subtitle anim-fade-in-up">Complete the multi-step verification to receive your portable credential.</p>
 
-    <!-- Stepper -->
+    <!-- Stepper — now 5 steps -->
     <div class="stepper anim-fade-in-up">
       <div class="step active" id="stepper-0"><span class="step__number">1</span> Document</div><div class="step__connector"></div>
       <div class="step" id="stepper-1"><span class="step__number">2</span> Liveness</div><div class="step__connector"></div>
-      <div class="step" id="stepper-2"><span class="step__number">3</span> Deepfake</div><div class="step__connector"></div>
-      <div class="step" id="stepper-3"><span class="step__number">4</span> Result</div>
+      <div class="step" id="stepper-2"><span class="step__number">3</span> Gesture</div><div class="step__connector"></div>
+      <div class="step" id="stepper-3"><span class="step__number">4</span> Deepfake</div><div class="step__connector"></div>
+      <div class="step" id="stepper-4"><span class="step__number">5</span> Result</div>
     </div>
 
     <!-- Step 1: Document -->
@@ -68,7 +73,7 @@
 
         <div style="margin-top:var(--space-lg);display:flex;gap:var(--space-md);">
           <button id="btn-upload" class="btn btn--primary" onclick="runDocumentOCR()"><i data-lucide="scan-line"></i> Run OCR Analysis</button>
-          <button id="btn-submit-doc" class="btn btn--primary" style="display:none;" onclick="submitDocument()"><i data-lucide="check-circle"></i> Confirm & Verify</button>
+          <button id="btn-submit-doc" class="btn btn--primary" style="display:none;" onclick="submitDocument()"><i data-lucide="check-circle"></i> Confirm &amp; Verify</button>
           <button id="btn-next-liveness" class="btn btn--success" style="display:none;" onclick="startLiveness()"><i data-lucide="arrow-right"></i> Next: Liveness Check</button>
         </div>
         
@@ -93,11 +98,57 @@
           <div class="challenge-card" id="challenge-smile"><div class="challenge-card__icon">😊</div><div class="challenge-card__title">Smile</div><div class="challenge-card__status">Waiting...</div></div>
         </div>
         <div id="liveness-result"></div>
+        <button id="btn-next-gesture" class="btn btn--success" style="display:none;margin-top:var(--space-lg);" onclick="startGestureAuth()"><i data-lucide="arrow-right"></i> Next: Hand Gesture Verification</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Gesture Authentication — Live Camera Only -->
+    <div id="step-gesture" style="display:none;">
+      <div class="card card--flat">
+        <h2 style="font-size:1.25rem;margin-bottom:var(--space-sm);">Hand Gesture Authentication</h2>
+        <p style="color:var(--text-secondary);margin-bottom:var(--space-lg);font-size:.875rem;">Complete the gesture challenges as a second-factor verification. Follow each instruction within the time limit.</p>
+
+        <div class="gesture-layout">
+          <div class="gesture-camera-wrap">
+            <div class="gesture-camera">
+              <video id="gesture-video" playsinline muted></video>
+              <canvas id="gesture-canvas"></canvas>
+              <div class="gesture-fps" id="gesture-fps">-- FPS</div>
+              <div class="gesture-feedback" id="gesture-feedback">
+                <span class="gesture-feedback__msg" id="gesture-feedback-msg"></span>
+              </div>
+            </div>
+          </div>
+          <div class="gesture-panel">
+            <div class="gesture-panel__label" id="gesture-challenge-label">Preparing...</div>
+            <div class="gesture-panel__instruction" id="gesture-instruction">Loading hand tracking model...</div>
+            <div class="gesture-countdown-row">
+              <div class="gesture-countdown-ring">
+                <svg viewBox="0 0 52 52">
+                  <circle class="gesture-ring-bg" cx="26" cy="26" r="22"></circle>
+                  <circle class="gesture-ring-fill" id="gesture-ring-fill" cx="26" cy="26" r="22" stroke-dasharray="138.23" stroke-dashoffset="0"></circle>
+                </svg>
+                <div class="gesture-countdown-text" id="gesture-countdown-text">--</div>
+              </div>
+              <span class="gesture-countdown-label">Time remaining</span>
+            </div>
+            <div class="gesture-timer-bar"><div class="gesture-timer-fill" id="gesture-timer-fill"></div></div>
+            <div class="gesture-metrics">
+              <div class="gesture-metric"><span class="gesture-metric__label">Score</span><span class="gesture-metric__value" id="gm-score">0%</span></div>
+              <div class="gesture-metric"><span class="gesture-metric__label">Frames</span><span class="gesture-metric__value" id="gm-frames">0 / 8</span></div>
+              <div class="gesture-metric"><span class="gesture-metric__label">Motion</span><span class="gesture-metric__value" id="gm-motion">Waiting</span></div>
+              <div class="gesture-metric"><span class="gesture-metric__label">Liveness</span><span class="gesture-metric__value" id="gm-liveness">--</span></div>
+            </div>
+            <div class="gesture-dots" id="gesture-dots"></div>
+          </div>
+        </div>
+
+        <div id="gesture-result"></div>
         <button id="btn-next-deepfake" class="btn btn--success" style="display:none;margin-top:var(--space-lg);" onclick="startDeepfakeAnalysis()"><i data-lucide="arrow-right"></i> Next: Deepfake Analysis</button>
       </div>
     </div>
 
-    <!-- Step 3: Deepfake -->
+    <!-- Step 4: Deepfake -->
     <div id="step-deepfake" style="display:none;">
       <div class="card card--flat">
         <h2 style="font-size:1.25rem;margin-bottom:var(--space-lg);">Deepfake Analysis</h2>
@@ -122,7 +173,7 @@
       </div>
     </div>
 
-    <!-- Step 4: Result -->
+    <!-- Step 5: Result -->
     <div id="step-result" style="display:none;">
       <div id="result-container"></div>
     </div>

@@ -43,6 +43,12 @@ const api = {
   checkAnomaly: (data) => api.post('/anomaly/check', data),
   getDashboard: () => api.get('/anomaly/dashboard'),
   getAlerts: () => api.get('/anomaly/alerts'),
+
+  // 2FA Auth
+  initAuth: (data) => api.post('/auth/init', data),
+  verifyFace: (data) => api.post('/auth/verify-face', data),
+  verifySecondary: (data) => api.post('/auth/verify-secondary', data),
+  getAuthStatus: (sessionId) => api.get(`/auth/status/${sessionId}`),
 };
 
 window.api = api;

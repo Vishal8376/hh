@@ -32,3 +32,101 @@
 .doc-upload__icon { font-size: 3rem; color: var(--text-muted); margin-bottom: var(--space-md); }
 .doc-upload__text { color: var(--text-secondary); }
 .doc-upload__text strong { color: var(--accent-blue); }
+
+/* ---- Gesture Auth (Step 3) ---- */
+.gesture-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--space-xl); }
+@media (max-width: 768px) { .gesture-layout { grid-template-columns: 1fr; } }
+
+.gesture-camera-wrap { width: 100%; }
+.gesture-camera {
+  position: relative; width: 100%; aspect-ratio: 4/3;
+  background: #000; border-radius: var(--radius-lg);
+  overflow: hidden; border: 1px solid var(--border-color);
+}
+.gesture-camera video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.gesture-camera canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.gesture-fps {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+  padding: 2px 8px; border-radius: var(--radius-full);
+  font-family: var(--font-mono); font-size: 0.65rem; color: var(--accent-green); z-index: 5;
+}
+.gesture-feedback {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  pointer-events: none; z-index: 6; opacity: 0; transition: opacity 0.25s;
+}
+.gesture-feedback.show { opacity: 1; }
+.gesture-feedback__msg {
+  padding: 10px 28px; border-radius: var(--radius-full);
+  font-weight: 700; font-size: 1rem; backdrop-filter: blur(16px);
+}
+.gesture-feedback.success .gesture-feedback__msg { background: rgba(16,185,129,0.25); color: #34d399; border: 1px solid rgba(16,185,129,0.35); }
+.gesture-feedback.error .gesture-feedback__msg   { background: rgba(239,68,68,0.25); color: #f87171; border: 1px solid rgba(239,68,68,0.35); }
+.gesture-feedback.warn .gesture-feedback__msg     { background: rgba(245,158,11,0.25); color: #fbbf24; border: 1px solid rgba(245,158,11,0.35); }
+
+.gesture-panel {
+  background: var(--bg-glass); border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg); padding: var(--space-lg);
+  display: flex; flex-direction: column; gap: var(--space-md);
+}
+.gesture-panel__label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+.gesture-panel__instruction { font-size: 1.15rem; font-weight: 800; min-height: 2.8rem; display: flex; align-items: center; }
+
+.gesture-countdown-row { display: flex; align-items: center; gap: var(--space-md); }
+.gesture-countdown-ring { width: 44px; height: 44px; position: relative; flex-shrink: 0; }
+.gesture-countdown-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.gesture-ring-bg   { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 4; }
+.gesture-ring-fill { fill: none; stroke: var(--accent-blue); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 0.1s linear, stroke 0.3s; }
+.gesture-countdown-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; }
+.gesture-countdown-label { font-size: 0.75rem; color: var(--text-secondary); }
+
+.gesture-timer-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.06); border-radius: var(--radius-full); overflow: hidden; }
+.gesture-timer-fill { height: 100%; border-radius: var(--radius-full); width: 100%; background: var(--accent-blue); transition: width 0.1s linear; }
+
+.gesture-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
+.gesture-metric {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: rgba(255,255,255,0.025);
+  border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.04);
+}
+.gesture-metric__label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.gesture-metric__value { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; color: var(--accent-blue); }
+
+.gesture-dots { display: flex; gap: 6px; justify-content: center; margin-top: var(--space-sm); }
+.gesture-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); background: transparent; transition: all 0.3s; }
+.gesture-dot.active { border-color: var(--accent-blue); box-shadow: 0 0 10px rgba(59,130,246,0.4); background: rgba(59,130,246,0.2); }
+.gesture-dot.pass  { border-color: var(--accent-green); background: var(--accent-green); }
+.gesture-dot.fail  { border-color: var(--accent-red); background: var(--accent-red); }
+
+/* ---- Mode Selection ---- */
+.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); }
+@media (max-width: 640px) { .mode-grid { grid-template-columns: 1fr; } }
+
+.mode-card {
+  background: var(--bg-glass); border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg); padding: var(--space-xl);
+  text-align: center; cursor: pointer;
+  transition: all var(--transition-base);
+  display: flex; flex-direction: column; align-items: center;
+  font-family: var(--font-sans); color: var(--text-primary);
+}
+.mode-card:hover { border-color: var(--accent-blue); background: rgba(59,130,246,0.06); transform: translateY(-2px); box-shadow: 0 4px 24px rgba(59,130,246,0.1); }
+.mode-card__icon { font-size: 2.5rem; margin-bottom: var(--space-md); }
+.mode-card__title { font-size: 1.05rem; font-weight: 700; margin-bottom: var(--space-xs); }
+.mode-card__desc { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
+
+/* ---- Upload Mode ---- */
+.upload-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--space-xl); align-items: start; }
+@media (max-width: 768px) { .upload-layout { grid-template-columns: 1fr; } }
+
+.upload-dropzone {
+  border: 2px dashed var(--border-color); border-radius: var(--radius-lg);
+  padding: var(--space-3xl) var(--space-xl); text-align: center;
+  cursor: pointer; transition: all var(--transition-base);
+}
+.upload-dropzone:hover { border-color: var(--accent-blue); background: rgba(59,130,246,0.04); }
+.upload-dropzone.drag-over { border-color: var(--accent-cyan); background: rgba(6,182,212,0.06); }
+.upload-dropzone__icon { font-size: 2.5rem; color: var(--text-muted); margin-bottom: var(--space-md); }
+.upload-dropzone__text { color: var(--text-secondary); font-size: 0.9rem; }
+.upload-dropzone__text strong { color: var(--accent-blue); }
+.upload-dropzone__hint { font-size: 0.7rem; color: var(--text-muted); margin-top: var(--space-sm); }

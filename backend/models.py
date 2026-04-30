@@ -30,7 +30,18 @@ def init_db():
             name TEXT NOT NULL,
             email TEXT,
             phone TEXT,
+            auth_data TEXT DEFAULT '{}',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS auth_logs (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            session_id TEXT,
+            method TEXT,
+            result TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         );
 
         CREATE TABLE IF NOT EXISTS verification_sessions (

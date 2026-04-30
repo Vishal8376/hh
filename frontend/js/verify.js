@@ -21,7 +21,7 @@ let headTurnState = { baseline: null, detected: false, magnitude: 0 };
 let smileState = { detected: false, confidence: 0 };
 let sessionStartTime = Date.now();
 
-const STEPS = ['document', 'liveness', 'deepfake', 'result'];
+const STEPS = ['document', 'liveness', 'gesture', 'deepfake', 'result'];
 
 document.addEventListener('DOMContentLoaded', async () => {
   initIcons();
@@ -419,7 +419,7 @@ async function completeLiveness() {
       </div>`;
     initIcons();
     if (passed) {
-      setTimeout(() => { document.getElementById('btn-next-deepfake').style.display = 'inline-flex'; }, 500);
+      setTimeout(() => { document.getElementById('btn-next-gesture').style.display = 'inline-flex'; }, 500);
     }
   } catch (e) {
     showToast('Liveness check failed', 'error');
@@ -437,9 +437,9 @@ function simulateLiveness() {
   setTimeout(() => completeLiveness(), 5000);
 }
 
-/* Step 3: Deepfake Analysis — send REAL landmark + expression data */
+/* Step 4: Deepfake Analysis — send REAL landmark + expression data */
 async function startDeepfakeAnalysis() {
-  showStep(2);
+  showStep(3);
   const checksContainer = document.getElementById('deepfake-checks');
   const gaugeValue = document.getElementById('gauge-value');
   const gaugeCircle = document.getElementById('gauge-circle');
@@ -535,9 +535,9 @@ function computeBoundingBox(lm) {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
-/* Step 4: Result & Credential Issuance */
+/* Step 5: Result & Credential Issuance */
 async function showResult() {
-  showStep(3);
+  showStep(4);
   if (video?.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); }
   if (faceDetectionInterval) { clearInterval(faceDetectionInterval); faceDetectionInterval = null; }
 
@@ -582,3 +582,590 @@ async function showResult() {
     showToast('Credential issuance failed', 'error');
   }
 }
+
+/* ================================================================
+   STEP 3 — GESTURE AUTHENTICATION ENGINE (embedded)
+   MediaPipe Hands · Joint-angle detection · Multi-frame scoring
+   Motion trajectory · Anti-spoofing
+   ================================================================ */
+
+const G_CFG = {
+  TOTAL: 4, PASS_REQ: 3, DURATION: 4000, THRESHOLD: 75,
+  MIN_FRAMES: 8, MOTION_BUF: 40,
+  FREEZE: 0.0005, TELEPORT: 0.18, DELAY: 1500,
+};
+
+const G_POOL = [
+  { type:'pose',   name:'palm',        text:'✋ Show Open Palm' },
+  { type:'pose',   name:'fist',        text:'✊ Make a Fist' },
+  { type:'pose',   name:'index',       text:'☝️ Raise Index Finger' },
+  { type:'pose',   name:'peace',       text:'✌️ Show Peace Sign' },
+  { type:'motion', name:'swipe_right', text:'👉 Move Hand Left to Right' },
+  { type:'motion', name:'circle',      text:'⭕ Draw a Circle in Air' },
+];
+
+let gVideo, gCanvas, gCtx, gHands, gCamera;
+let gChallenges=[], gIdx=-1, gActive=false, gStart=0, gTimerRAF=null;
+let gGoodFrames=0, gTotalFrames=0, gResults=[], gMotionBuf=[], gPrevLm=null, gFrozen=0;
+let gFpsCount=0, gFpsLast=performance.now(), gFps=0;
+
+function startGestureAuth() {
+  showStep(2); // gesture is index 2
+  // Stop face camera if running
+  if (video?.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); }
+  if (faceDetectionInterval) { clearInterval(faceDetectionInterval); faceDetectionInterval = null; }
+
+  gVideo = document.getElementById('gesture-video');
+  gCanvas = document.getElementById('gesture-canvas');
+  gCtx = gCanvas.getContext('2d');
+
+  const dotsEl = document.getElementById('gesture-dots');
+  dotsEl.innerHTML = '';
+  for (let i = 0; i < G_CFG.TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'gesture-dot'; d.id = `gdot-${i}`;
+    dotsEl.appendChild(d);
+  }
+
+  gChallenges = [...G_POOL].sort(() => Math.random()-0.5).slice(0, G_CFG.TOTAL);
+  gIdx = -1; gActive = false; gResults = [];
+  initGestureMediaPipe();
+}
+
+function initGestureMediaPipe() {
+  gHands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  gHands.setOptions({ maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.65, minTrackingConfidence:0.6 });
+  gHands.onResults(onGestureFrame);
+
+  navigator.mediaDevices.getUserMedia({ video:{ width:640, height:480, facingMode:'user' } })
+    .then(stream => {
+      gVideo.srcObject = stream;
+      gVideo.play();
+      gCanvas.width = 640; gCanvas.height = 480;
+      gCamera = new Camera(gVideo, {
+        onFrame: async () => { await gHands.send({ image: gVideo }); },
+        width: 640, height: 480,
+      });
+      gCamera.start();
+      gSetInstruction('Show your hand to begin', 'Model loaded');
+      setTimeout(gNextChallenge, 2000);
+    })
+    .catch(() => {
+      gSetInstruction('Camera denied — cannot proceed', 'Error');
+    });
+}
+
+function gNextChallenge() {
+  gIdx++;
+  if (gIdx >= gChallenges.length) { gFinishSession(); return; }
+  gGoodFrames = 0; gTotalFrames = 0; gMotionBuf.length = 0; gPrevLm = null; gFrozen = 0;
+  const ch = gChallenges[gIdx];
+  gSetInstruction(ch.text, `Challenge ${gIdx+1} of ${gChallenges.length}`);
+  document.getElementById(`gdot-${gIdx}`).classList.add('active');
+  gActive = true; gStart = performance.now();
+  gRunTimer();
+}
+
+function gRunTimer() {
+  if (!gActive) return;
+  const elapsed = performance.now() - gStart;
+  const pct = Math.max(0, 1 - elapsed / G_CFG.DURATION);
+  const secs = Math.max(0, (G_CFG.DURATION - elapsed) / 1000).toFixed(1);
+  const fill = document.getElementById('gesture-timer-fill');
+  fill.style.width = `${pct*100}%`;
+  fill.style.background = pct > 0.3 ? 'var(--accent-blue)' : pct > 0.15 ? 'var(--accent-orange)' : 'var(--accent-red)';
+  const circ = 2 * Math.PI * 22;
+  document.getElementById('gesture-ring-fill').style.strokeDashoffset = circ * (1-pct);
+  document.getElementById('gesture-ring-fill').style.stroke = pct > 0.3 ? '#3b82f6' : '#ef4444';
+  document.getElementById('gesture-countdown-text').textContent = secs;
+  if (elapsed >= G_CFG.DURATION) { gEndChallenge(false, 'Too Slow'); return; }
+  gTimerRAF = requestAnimationFrame(gRunTimer);
+}
+
+function onGestureFrame(res) {
+  gFpsCount++;
+  const now = performance.now();
+  if (now - gFpsLast >= 1000) { gFps = gFpsCount; gFpsCount = 0; gFpsLast = now; document.getElementById('gesture-fps').textContent = `${gFps} FPS`; }
+  gCtx.clearRect(0, 0, gCanvas.width, gCanvas.height);
+
+  if (!res.multiHandLandmarks || !res.multiHandLandmarks.length) {
+    gDrawNoHand(); return;
+  }
+  const lm = res.multiHandLandmarks[0];
+  gDrawHand(lm);
+  if (!gActive) return;
+
+  gTotalFrames++;
+
+  // Anti-spoofing
+  const spoof = gAntiSpoof(lm);
+  document.getElementById('gm-liveness').textContent = spoof.label;
+  document.getElementById('gm-liveness').style.color = spoof.ok ? 'var(--accent-green)' : 'var(--accent-red)';
+  if (!spoof.ok) { gPrevLm = lm; return; }
+
+  // Gesture analysis
+  const ch = gChallenges[gIdx];
+  let score = 0;
+  if (ch.type === 'pose') score = gEvalPose(ch.name, lm);
+  else {
+    const c = gPalmCenter(lm);
+    gMotionBuf.push({ x:c.x, y:c.y, t:now });
+    if (gMotionBuf.length > G_CFG.MOTION_BUF) gMotionBuf.shift();
+    score = gEvalMotion(ch.name);
+  }
+
+  if (score >= G_CFG.THRESHOLD) gGoodFrames++; else if (score < G_CFG.THRESHOLD*0.5) gGoodFrames = Math.max(0, gGoodFrames-1);
+
+  // UI
+  document.getElementById('gm-score').textContent = `${Math.round(score)}%`;
+  document.getElementById('gm-score').style.color = score >= G_CFG.THRESHOLD ? 'var(--accent-green)' : 'var(--accent-orange)';
+  document.getElementById('gm-frames').textContent = `${gGoodFrames} / ${G_CFG.MIN_FRAMES}`;
+  document.getElementById('gm-motion').textContent = spoof.motionLabel;
+
+  if (gGoodFrames >= G_CFG.MIN_FRAMES && score >= G_CFG.THRESHOLD) gEndChallenge(true, 'Verified!');
+  gPrevLm = lm;
+}
+
+// ---- Anti-spoofing ----
+function gAntiSpoof(lm) {
+  if (!gPrevLm) return { ok:true, label:'Checking...', motionLabel:'Waiting' };
+  let disp = 0;
+  for (let i=0; i<21; i++) { const dx=lm[i].x-gPrevLm[i].x, dy=lm[i].y-gPrevLm[i].y; disp += Math.sqrt(dx*dx+dy*dy); }
+  const avg = disp/21;
+  if (avg < G_CFG.FREEZE) { gFrozen++; if (gFrozen > 6) return { ok:false, label:'⚠ Static', motionLabel:'Frozen' }; }
+  else gFrozen = Math.max(0, gFrozen-1);
+  if (avg > G_CFG.TELEPORT) return { ok:false, label:'⚠ Jump', motionLabel:'Teleport' };
+  return { ok:true, label:'Live', motionLabel: avg < 0.002 ? 'Very Still' : avg > 0.08 ? 'Fast' : 'Natural' };
+}
+
+// ---- Joint-angle finger detection ----
+function gJointAngle(a,b,c) {
+  const ba={x:a.x-b.x,y:a.y-b.y,z:(a.z||0)-(b.z||0)}, bc={x:c.x-b.x,y:c.y-b.y,z:(c.z||0)-(b.z||0)};
+  const dot=ba.x*bc.x+ba.y*bc.y+ba.z*bc.z;
+  const m1=Math.sqrt(ba.x**2+ba.y**2+ba.z**2), m2=Math.sqrt(bc.x**2+bc.y**2+bc.z**2);
+  if(m1*m2===0) return 0;
+  return Math.acos(Math.max(-1,Math.min(1,dot/(m1*m2))))*(180/Math.PI);
+}
+
+function gFingerExt(lm, fi) {
+  const j=[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]];
+  const [mcp,pip,dip,tip]=j[fi];
+  if(fi===0) return gDist(lm[tip],lm[5])>0.08;
+  return gJointAngle(lm[mcp],lm[pip],lm[dip])>140 && lm[tip].y<lm[pip].y;
+}
+
+function gFingerStates(lm) { return [0,1,2,3,4].map(i=>gFingerExt(lm,i)); }
+
+// ---- Pose classifiers ----
+function gEvalPose(name, lm) {
+  const [thumb,idx,mid,ring,pinky] = gFingerStates(lm);
+  switch(name) {
+    case 'palm': { const n=[thumb,idx,mid,ring,pinky].filter(Boolean).length; return Math.min(100,(n/5)*90+(gDist(lm[8],lm[20])>0.12?10:0)); }
+    case 'fist': { const pc=gPalmCenter(lm); let c=0; [8,12,16,20].forEach(t=>{const d=gDist(lm[t],pc);if(d<0.08)c+=25;else if(d<0.12)c+=15;}); return Math.max(0,c-[idx,mid,ring,pinky].filter(Boolean).length*15); }
+    case 'index': return (idx?40:0)+([mid,ring,pinky].filter(b=>!b).length/3)*60;
+    case 'peace': return (idx?30:0)+(mid?30:0)+(!ring?20:0)+(!pinky?20:0);
+    default: return 0;
+  }
+}
+
+// ---- Motion classifiers ----
+function gEvalMotion(name) {
+  if(gMotionBuf.length<15) return 0;
+  if(name==='swipe_right') {
+    const r=gMotionBuf.slice(-20); if(r.length<15) return 0;
+    const dx=r[0].x-r[r.length-1].x, ys=r.map(p=>p.y), yr=Math.max(...ys)-Math.min(...ys);
+    const dt=(r[r.length-1].t-r[0].t)/1000, sp=Math.abs(dx)/Math.max(dt,0.001);
+    let s=0; if(Math.abs(dx)>0.25)s+=50;else if(Math.abs(dx)>0.15)s+=30; if(yr<0.12)s+=25;else if(yr<0.2)s+=10; if(sp>0.3&&sp<3)s+=25;
+    return Math.min(100,s);
+  }
+  if(name==='circle') {
+    const r=gMotionBuf.slice(-30); if(r.length<20) return 0;
+    const cx=r.reduce((s,p)=>s+p.x,0)/r.length, cy=r.reduce((s,p)=>s+p.y,0)/r.length;
+    const radii=r.map(p=>Math.sqrt((p.x-cx)**2+(p.y-cy)**2)), mr=radii.reduce((a,b)=>a+b,0)/radii.length;
+    if(mr<0.04) return 0;
+    const v=radii.reduce((s,rd)=>s+(rd-mr)**2,0)/radii.length, cv=Math.sqrt(v)/mr;
+    const quads=new Set(r.map(p=>Math.floor(((Math.atan2(p.y-cy,p.x-cx)+Math.PI)/(Math.PI/2))%4)));
+    let s=0; if(cv<0.3)s+=45;else if(cv<0.5)s+=25; if(quads.size>=4)s+=35;else if(quads.size>=3)s+=20; if(mr>0.06)s+=20;
+    return Math.min(100,s);
+  }
+  return 0;
+}
+
+// ---- Challenge flow ----
+function gEndChallenge(passed, text) {
+  if (!gActive) return;
+  gActive = false; cancelAnimationFrame(gTimerRAF);
+  const avg = gTotalFrames>0 ? Math.round((gGoodFrames/gTotalFrames)*100) : 0;
+  gResults.push({ name:gChallenges[gIdx].text, passed, score:avg });
+  const dot = document.getElementById(`gdot-${gIdx}`);
+  dot.classList.remove('active'); dot.classList.add(passed?'pass':'fail');
+  gShowFeedback(text, passed?'success': text==='Too Slow'?'warn':'error');
+  setTimeout(gNextChallenge, G_CFG.DELAY);
+}
+
+function gFinishSession() {
+  const passCount = gResults.filter(r=>r.passed).length;
+  const ok = passCount >= G_CFG.PASS_REQ;
+  const avg = gResults.length ? Math.round(gResults.reduce((s,r)=>s+r.score,0)/gResults.length) : 0;
+
+  // Stop gesture camera
+  if (gVideo?.srcObject) gVideo.srcObject.getTracks().forEach(t=>t.stop());
+
+  // Show result in the gesture step
+  const el = document.getElementById('gesture-result');
+  const color = ok ? 'var(--accent-green)' : 'var(--accent-red)';
+  el.innerHTML = `
+    <div class="card" style="border-color:${color};margin-top:var(--space-lg);">
+      <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:var(--space-md);">
+        <i data-lucide="${ok?'check-circle':'x-circle'}" style="color:${color}"></i>
+        <strong>${ok?'Gesture Auth Passed':'Gesture Auth Failed'}</strong>
+        <span class="badge ${ok?'badge--green':'badge--red'}">${passCount}/${gResults.length} passed · ${avg}% avg</span>
+      </div>
+      <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap;">
+        ${gResults.map(r=>`<span class="badge ${r.passed?'badge--green':'badge--red'}" style="font-size:.7rem;">${r.passed?'✓':'✗'} ${r.name.replace(/^.{2} /,'')}</span>`).join('')}
+      </div>
+    </div>`;
+  initIcons();
+
+  if (ok) {
+    setTimeout(() => { document.getElementById('btn-next-deepfake').style.display = 'inline-flex'; }, 500);
+  }
+
+  // Log to backend
+  api.verifySecondary({ session_id: sessionId, method:'gesture', success:ok, details:gResults }).catch(()=>{});
+}
+
+// ---- Drawing ----
+function gDrawHand(lm) {
+  gCtx.save(); gCtx.translate(gCanvas.width,0); gCtx.scale(-1,1);
+  drawConnectors(gCtx, lm, HAND_CONNECTIONS, {color:'rgba(59,130,246,0.55)',lineWidth:3});
+  const states = gFingerStates(lm);
+  const tips=[4,8,12,16,20];
+  for(let i=0;i<21;i++){
+    const pt=lm[i], isTip=tips.includes(i);
+    const fg=i<=4?0:i<=8?1:i<=12?2:i<=16?3:4;
+    gCtx.beginPath(); gCtx.arc(pt.x*gCanvas.width,pt.y*gCanvas.height,isTip?5:3,0,Math.PI*2);
+    gCtx.fillStyle=isTip?(states[fg]?'rgba(16,185,129,0.9)':'rgba(239,68,68,0.9)'):'rgba(255,255,255,0.7)';
+    gCtx.fill();
+  }
+  gCtx.restore();
+}
+
+function gDrawNoHand() {
+  gCtx.strokeStyle='rgba(239,68,68,0.3)'; gCtx.lineWidth=2; gCtx.setLineDash([8,8]);
+  gCtx.beginPath(); gCtx.ellipse(gCanvas.width/2,gCanvas.height/2,90,120,0,0,Math.PI*2); gCtx.stroke();
+  gCtx.setLineDash([]);
+}
+
+// ---- Helpers ----
+function gDist(a,b){ return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2); }
+function gPalmCenter(lm){ const p=[0,5,9,13,17]; return { x:p.reduce((s,i)=>s+lm[i].x,0)/5, y:p.reduce((s,i)=>s+lm[i].y,0)/5 }; }
+function gSetInstruction(t, l) { document.getElementById('gesture-instruction').textContent=t; document.getElementById('gesture-challenge-label').textContent=l; }
+function gShowFeedback(t, type) {
+  const el=document.getElementById('gesture-feedback'), msg=document.getElementById('gesture-feedback-msg');
+  msg.textContent=t; el.className=`gesture-feedback ${type} show`;
+  setTimeout(()=>el.classList.remove('show'),1200);
+}
+
+/* ================================================================
+   MODE B — FILE UPLOAD VERIFICATION ENGINE
+   Image: single-frame landmark analysis
+   Video: frame-by-frame extraction + motion + anti-spoof
+   Stricter threshold (80%) for uploads
+   ================================================================ */
+
+const UPLOAD_THRESHOLD = 80; // Stricter than live (75)
+let uploadHands = null;
+
+function initUploadDropzone() {
+  const dz = document.getElementById('gesture-dropzone');
+  ['dragenter','dragover'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('drag-over'); }));
+  ['dragleave','drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('drag-over'); }));
+  dz.addEventListener('drop', ev => {
+    const file = ev.dataTransfer.files[0];
+    if (file) processGestureFileSelection(file);
+  });
+}
+
+function handleGestureFile(ev) {
+  const file = ev.target.files[0];
+  if (file) processGestureFileSelection(file);
+}
+
+function processGestureFileSelection(file) {
+  // Validate
+  const maxSize = 20 * 1024 * 1024;
+  const validTypes = ['image/jpeg','image/png','image/webp','video/mp4','video/webm'];
+  if (!validTypes.includes(file.type)) { showToast('Invalid file type. Use JPG, PNG, MP4, or WebM.', 'error'); return; }
+  if (file.size > maxSize) { showToast('File too large. Max 20MB.', 'error'); return; }
+
+  uploadedGestureFile = file;
+  const isImage = file.type.startsWith('image');
+  const url = URL.createObjectURL(file);
+
+  document.getElementById('upload-preview-wrap').style.display = 'block';
+  const imgPrev = document.getElementById('upload-img-preview');
+  const vidPrev = document.getElementById('upload-vid-preview');
+
+  if (isImage) {
+    imgPrev.src = url; imgPrev.style.display = 'block'; vidPrev.style.display = 'none';
+  } else {
+    vidPrev.src = url; vidPrev.style.display = 'block'; imgPrev.style.display = 'none';
+  }
+
+  document.getElementById('btn-analyze-upload').style.display = 'inline-flex';
+  initIcons();
+}
+
+async function analyzeUploadedFile() {
+  if (!uploadedGestureFile) return;
+  document.getElementById('btn-analyze-upload').style.display = 'none';
+  document.getElementById('upload-progress-wrap').style.display = 'block';
+
+  // Init MediaPipe for upload processing
+  if (!uploadHands) {
+    uploadHands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+    uploadHands.setOptions({ maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.6, minTrackingConfidence:0.5 });
+  }
+
+  const isImage = uploadedGestureFile.type.startsWith('image');
+  if (isImage) {
+    await analyzeImage();
+  } else {
+    await analyzeVideo();
+  }
+}
+
+/* ---- Image Analysis ---- */
+async function analyzeImage() {
+  setUploadProgress(10, 'Loading image...');
+  const img = document.getElementById('upload-img-preview');
+  await new Promise(r => { if (img.complete) r(); else img.onload = r; });
+
+  setUploadProgress(30, 'Detecting hand landmarks...');
+  const canvas = document.getElementById('upload-analysis-canvas');
+  canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+  canvas.style.display = 'block';
+  const uctx = canvas.getContext('2d');
+  uctx.drawImage(img, 0, 0);
+
+  // Run MediaPipe on the image
+  let detectedLm = null;
+  uploadHands.onResults(res => {
+    if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+      detectedLm = res.multiHandLandmarks[0];
+    }
+  });
+  await uploadHands.send({ image: img });
+
+  setUploadProgress(70, 'Analyzing gesture...');
+  await sleep(300);
+
+  if (!detectedLm) {
+    finishUploadAnalysis({ hand: false, gesture: 'None', confidence: 0, spoof: 'N/A',
+      status: 'REJECTED', reason: 'No hand detected in image.', details: ['Hand not found — upload a clear image of your hand.'] });
+    return;
+  }
+
+  // Draw landmarks on canvas
+  uctx.drawImage(img, 0, 0);
+  drawConnectors(uctx, detectedLm, HAND_CONNECTIONS, {color:'rgba(59,130,246,0.7)',lineWidth:3});
+  for (const pt of detectedLm) { uctx.beginPath(); uctx.arc(pt.x*canvas.width, pt.y*canvas.height, 4, 0, Math.PI*2); uctx.fillStyle='#10b981'; uctx.fill(); }
+
+  // Classify gesture
+  const bestGesture = classifyBestGesture(detectedLm);
+  const confidence = bestGesture.score;
+  const passed = confidence >= UPLOAD_THRESHOLD;
+
+  setUploadProgress(100, 'Complete');
+  finishUploadAnalysis({
+    hand: true, gesture: bestGesture.name, confidence,
+    spoof: 'Static image — limited verification',
+    status: passed ? 'VERIFIED' : 'NEEDS RETRY',
+    reason: passed ? `Gesture "${bestGesture.name}" detected with ${confidence}% confidence.` : `Low confidence (${confidence}%). Try live verification.`,
+    details: [
+      `Detected: ${bestGesture.name} (${confidence}%)`,
+      `Finger states: ${bestGesture.fingers}`,
+      passed ? '' : '⚠ Image mode cannot verify motion or liveness.',
+      passed ? '' : '💡 Recommendation: Use live camera for higher trust.',
+    ].filter(Boolean),
+  });
+}
+
+/* ---- Video Analysis ---- */
+async function analyzeVideo() {
+  setUploadProgress(5, 'Loading video...');
+  const vid = document.getElementById('upload-vid-preview');
+  await new Promise(r => { vid.onloadeddata = r; if (vid.readyState >= 2) r(); });
+
+  const canvas = document.getElementById('upload-analysis-canvas');
+  canvas.width = vid.videoWidth; canvas.height = vid.videoHeight;
+  canvas.style.display = 'block';
+  const uctx = canvas.getContext('2d');
+
+  // Extract frames
+  const duration = vid.duration;
+  const fps = 5; // sample 5 frames/sec
+  const totalFrames = Math.min(Math.floor(duration * fps), 60); // cap at 60 frames
+  if (totalFrames < 5) {
+    finishUploadAnalysis({ hand: false, gesture: 'None', confidence: 0, spoof: 'Too few frames',
+      status: 'REJECTED', reason: 'Video too short. Minimum 1 second required.',
+      details: ['Upload a longer video showing hand gesture movement.'] });
+    return;
+  }
+
+  setUploadProgress(10, `Extracting ${totalFrames} frames...`);
+
+  const frameLandmarks = [];
+  const frameScores = [];
+  let handsDetected = 0;
+  let prevLm = null;
+  let staticFrames = 0;
+
+  uploadHands.onResults(res => {
+    if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+      frameLandmarks.push(res.multiHandLandmarks[0]);
+    } else {
+      frameLandmarks.push(null);
+    }
+  });
+
+  for (let i = 0; i < totalFrames; i++) {
+    const time = i / fps;
+    vid.currentTime = time;
+    await new Promise(r => { vid.onseeked = r; });
+    uctx.drawImage(vid, 0, 0);
+    await uploadHands.send({ image: canvas });
+
+    const pct = 10 + Math.round((i / totalFrames) * 70);
+    setUploadProgress(pct, `Analyzing frame ${i + 1}/${totalFrames}...`);
+  }
+
+  setUploadProgress(85, 'Computing scores...');
+
+  // Score each frame
+  for (let i = 0; i < frameLandmarks.length; i++) {
+    const lm = frameLandmarks[i];
+    if (!lm) { frameScores.push(0); continue; }
+    handsDetected++;
+    const best = classifyBestGesture(lm);
+    frameScores.push(best.score);
+
+    // Anti-spoof: check for static/repeated frames
+    if (prevLm) {
+      let disp = 0;
+      for (let j = 0; j < 21; j++) { disp += Math.sqrt((lm[j].x-prevLm[j].x)**2+(lm[j].y-prevLm[j].y)**2); }
+      if (disp / 21 < 0.001) staticFrames++;
+    }
+    prevLm = lm;
+  }
+
+  // Compute results
+  const handRatio = handsDetected / totalFrames;
+  const avgScore = frameScores.length ? Math.round(frameScores.reduce((a,b)=>a+b,0) / frameScores.length) : 0;
+  const goodFrames = frameScores.filter(s => s >= UPLOAD_THRESHOLD).length;
+  const consistency = totalFrames > 0 ? Math.round((goodFrames / totalFrames) * 100) : 0;
+  const staticRatio = totalFrames > 1 ? staticFrames / (totalFrames - 1) : 0;
+
+  // Motion check
+  const hasMotion = staticRatio < 0.7; // Less than 70% static frames
+  const hasContinuity = handRatio > 0.5; // Hand visible in >50% of frames
+
+  // Determine overall result
+  let status, reason;
+  const details = [
+    `Frames analyzed: ${totalFrames}`,
+    `Hand detected in ${handsDetected}/${totalFrames} frames (${Math.round(handRatio*100)}%)`,
+    `Good frames: ${goodFrames}/${totalFrames} (above ${UPLOAD_THRESHOLD}% threshold)`,
+    `Avg gesture score: ${avgScore}%`,
+    `Frame consistency: ${consistency}%`,
+    `Static frame ratio: ${Math.round(staticRatio*100)}%`,
+  ];
+
+  if (!hasContinuity) {
+    status = 'REJECTED'; reason = 'Insufficient hand visibility. Hand must be visible in most frames.';
+    details.push('⚠ Hand not detected in enough frames.');
+  } else if (!hasMotion) {
+    status = 'REJECTED'; reason = 'Static or replayed video detected. Real motion required.';
+    details.push('⚠ Frames appear identical — possible replay attack.');
+  } else if (consistency >= 60 && avgScore >= UPLOAD_THRESHOLD) {
+    status = 'VERIFIED'; reason = `Video verified with ${avgScore}% avg score and ${consistency}% consistency.`;
+  } else if (avgScore >= 60) {
+    status = 'NEEDS RETRY'; reason = `Score borderline (${avgScore}%). Try live camera for better results.`;
+    details.push('💡 Live camera verification is recommended.');
+  } else {
+    status = 'REJECTED'; reason = `Low confidence (${avgScore}%). Gesture not clearly recognized.`;
+  }
+
+  setUploadProgress(100, 'Complete');
+  finishUploadAnalysis({
+    hand: handsDetected > 0, gesture: 'Multi-frame', confidence: avgScore,
+    spoof: hasMotion ? (staticRatio < 0.3 ? 'Natural motion' : 'Low motion') : '⚠ Static/Replay',
+    status, reason, details,
+  });
+}
+
+/* ---- Shared helpers for upload ---- */
+function classifyBestGesture(lm) {
+  const poses = ['palm','fist','index','peace'];
+  let best = { name:'Unknown', score:0, fingers:'' };
+  const states = gFingerStates(lm);
+  const fingerNames = ['Thumb','Index','Middle','Ring','Pinky'];
+  const fingerStr = states.map((s,i) => `${fingerNames[i]}:${s?'Open':'Closed'}`).join(', ');
+
+  for (const name of poses) {
+    const s = gEvalPose(name, lm);
+    if (s > best.score) best = { name, score: Math.round(s), fingers: fingerStr };
+  }
+  return best;
+}
+
+function finishUploadAnalysis(r) {
+  document.getElementById('upload-progress-wrap').style.display = 'none';
+  const panel = document.getElementById('upload-results-panel');
+  panel.style.display = 'flex';
+
+  const statusEl = document.getElementById('upload-result-status');
+  statusEl.textContent = r.status;
+  statusEl.style.color = r.status === 'VERIFIED' ? 'var(--accent-green)' : r.status === 'NEEDS RETRY' ? 'var(--accent-orange)' : 'var(--accent-red)';
+
+  document.getElementById('um-confidence').textContent = `${r.confidence}%`;
+  document.getElementById('um-confidence').style.color = r.confidence >= UPLOAD_THRESHOLD ? 'var(--accent-green)' : 'var(--accent-orange)';
+  document.getElementById('um-hand').textContent = r.hand ? 'Yes ✓' : 'No ✗';
+  document.getElementById('um-hand').style.color = r.hand ? 'var(--accent-green)' : 'var(--accent-red)';
+  document.getElementById('um-gesture').textContent = r.gesture;
+  document.getElementById('um-spoof').textContent = r.spoof;
+  document.getElementById('um-spoof').style.color = r.spoof.includes('⚠') ? 'var(--accent-red)' : 'var(--accent-green)';
+
+  document.getElementById('upload-detail-list').innerHTML = r.details.map(d =>
+    `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);">${d}</div>`
+  ).join('');
+
+  // Show result card
+  const el = document.getElementById('gesture-result');
+  const ok = r.status === 'VERIFIED';
+  const color = ok ? 'var(--accent-green)' : r.status === 'NEEDS RETRY' ? 'var(--accent-orange)' : 'var(--accent-red)';
+  el.innerHTML = `
+    <div class="card" style="border-color:${color};margin-top:var(--space-lg);">
+      <div style="display:flex;align-items:center;gap:var(--space-sm);flex-wrap:wrap;">
+        <i data-lucide="${ok?'check-circle':'alert-triangle'}" style="color:${color}"></i>
+        <strong>${r.status}</strong>
+        <span class="badge ${ok?'badge--green':'badge--orange'}">${r.confidence}% confidence · Upload mode</span>
+      </div>
+      <p style="color:var(--text-secondary);margin-top:var(--space-sm);font-size:.875rem;">${r.reason}</p>
+    </div>`;
+  initIcons();
+
+  if (ok) {
+    setTimeout(() => { document.getElementById('btn-next-deepfake').style.display = 'inline-flex'; }, 500);
+  }
+
+  api.verifySecondary({ session_id: sessionId, method: 'gesture-upload', success: ok, details: [r] }).catch(()=>{});
+}
+
+function setUploadProgress(pct, text) {
+  document.getElementById('upload-progress-bar').style.width = `${pct}%`;
+  document.getElementById('upload-progress-text').textContent = text;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }

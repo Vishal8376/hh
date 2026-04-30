@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrustVault — Hand Gesture Authentication</title>
+  <meta name="description" content="Real-time hand gesture authentication with dynamic challenge-response, motion verification, and anti-spoofing for secure identity verification.">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <style>
+    /* ---- Page Layout ---- */
+    .gesture-page { max-width: 1060px; margin: 0 auto; padding: calc(var(--nav-height) + var(--space-2xl)) var(--space-xl) var(--space-3xl); }
+    .page-header { text-align: center; margin-bottom: var(--space-2xl); }
+    .page-header h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 900; letter-spacing: -0.02em; }
+    .page-header h1 span { background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .page-header p { color: var(--text-secondary); max-width: 520px; margin: var(--space-sm) auto 0; }
+
+    .main-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--space-xl); align-items: start; }
+    @media (max-width: 820px) { .main-grid { grid-template-columns: 1fr; } }
+
+    /* ---- Camera Viewport ---- */
+    .camera-viewport {
+      position: relative; width: 100%; aspect-ratio: 4/3;
+      background: #000; border-radius: var(--radius-xl);
+      overflow: hidden; border: 1px solid var(--border-color);
+      box-shadow: 0 0 60px rgba(59,130,246,0.06);
+    }
+    #live-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    #overlay-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    /* Corner guides */
+    .corner-guide { position: absolute; width: 28px; height: 28px; border-color: rgba(59,130,246,0.45); border-style: solid; }
+    .corner-guide.tl { top: 20px; left: 20px; border-width: 2px 0 0 2px; border-radius: 6px 0 0 0; }
+    .corner-guide.tr { top: 20px; right: 20px; border-width: 2px 2px 0 0; border-radius: 0 6px 0 0; }
+    .corner-guide.bl { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; border-radius: 0 0 0 6px; }
+    .corner-guide.br { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; border-radius: 0 0 6px 0; }
+
+    /* FPS counter */
+    .fps-badge { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); padding: 3px 10px; border-radius: var(--radius-full); font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-green); z-index: 5; }
+
+    /* Feedback overlay */
+    .feedback-overlay {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      pointer-events: none; z-index: 6; opacity: 0; transition: opacity 0.25s;
+    }
+    .feedback-overlay.show { opacity: 1; }
+    .feedback-overlay .msg {
+      padding: 12px 32px; border-radius: var(--radius-full);
+      font-weight: 700; font-size: 1.1rem; backdrop-filter: blur(16px);
+    }
+    .feedback-overlay.success .msg { background: rgba(16,185,129,0.25); color: #34d399; border: 1px solid rgba(16,185,129,0.35); }
+    .feedback-overlay.error .msg   { background: rgba(239,68,68,0.25); color: #f87171; border: 1px solid rgba(239,68,68,0.35); }
+    .feedback-overlay.warn .msg    { background: rgba(245,158,11,0.25); color: #fbbf24; border: 1px solid rgba(245,158,11,0.35); }
+
+    /* ---- Sidebar Panel ---- */
+    .sidebar { display: flex; flex-direction: column; gap: var(--space-lg); }
+
+    /* Instruction Card */
+    .instruction-card {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg); padding: var(--space-xl);
+      backdrop-filter: blur(12px); position: relative; overflow: hidden;
+    }
+    .instruction-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--gradient-primary); opacity: 0.6;
+    }
+    .challenge-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: var(--space-xs); }
+    .challenge-instruction {
+      font-size: 1.35rem; font-weight: 800; line-height: 1.3;
+      min-height: 3.6rem; display: flex; align-items: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    /* Countdown ring */
+    .countdown-ring-wrap { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); }
+    .countdown-ring { width: 48px; height: 48px; position: relative; }
+    .countdown-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .countdown-ring .bg   { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 4; }
+    .countdown-ring .fill { fill: none; stroke: var(--accent-blue); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 0.1s linear, stroke 0.3s; }
+    .countdown-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; }
+    .countdown-label { font-size: 0.8rem; color: var(--text-secondary); }
+
+    /* Timer bar (alternative, simpler) */
+    .timer-bar { width: 100%; height: 5px; background: rgba(255,255,255,0.06); border-radius: var(--radius-full); overflow: hidden; margin-bottom: var(--space-xl); }
+    .timer-fill { height: 100%; border-radius: var(--radius-full); width: 100%; transition: width 0.1s linear; }
+
+    /* Metrics */
+    .metrics-grid { display: grid; gap: var(--space-sm); }
+    .metric-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: rgba(255,255,255,0.025);
+      border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.04);
+    }
+    .metric-row .label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric-row .value { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; }
+
+    /* Score bar inside metric row */
+    .score-bar-wrap { width: 80px; height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+    .score-bar-inner { height: 100%; border-radius: 3px; width: 0%; transition: width 0.2s, background 0.3s; }
+
+    /* ---- Progress Dots ---- */
+    .progress-track { display: flex; gap: 6px; justify-content: center; margin-top: var(--space-lg); }
+    .pdot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); background: transparent; transition: all 0.3s; }
+    .pdot.active { border-color: var(--accent-blue); box-shadow: 0 0 12px rgba(59,130,246,0.4); background: rgba(59,130,246,0.2); }
+    .pdot.pass  { border-color: var(--accent-green); background: var(--accent-green); box-shadow: 0 0 10px rgba(16,185,129,0.4); }
+    .pdot.fail  { border-color: var(--accent-red); background: var(--accent-red); }
+
+    /* ---- Result Modal ---- */
+    .result-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(12px);
+      z-index: 100; display: none; align-items: center; justify-content: center;
+    }
+    .result-backdrop.show { display: flex; }
+    .result-panel {
+      background: var(--bg-secondary); border: 1px solid var(--border-color);
+      border-radius: var(--radius-xl); padding: var(--space-2xl) var(--space-2xl) var(--space-xl);
+      max-width: 420px; width: 90%; text-align: center;
+    }
+    .result-icon { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto var(--space-lg); }
+    .result-icon.ok  { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+    .result-icon.bad { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+    .result-panel h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: var(--space-sm); }
+    .result-panel p  { color: var(--text-secondary); margin-bottom: var(--space-xl); line-height: 1.6; font-size: 0.95rem; }
+    .result-stats { display: flex; gap: var(--space-md); justify-content: center; margin-bottom: var(--space-xl); }
+    .result-stat { text-align: center; }
+    .result-stat .num { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 800; }
+    .result-stat .lbl { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="particles"></div>
+
+  <nav class="nav" role="navigation">
+    <a href="index.html" class="nav__brand"><i data-lucide="shield-check"></i> TrustVault</a>
+    <ul class="nav__links">
+      <li><a href="index.html" class="nav__link">Home</a></li>
+      <li><a href="verify.html" class="nav__link">Verify</a></li>
+      <li><a href="gesture_auth.html" class="nav__link active">Gesture Auth</a></li>
+      <li><a href="wallet.html" class="nav__link">Wallet</a></li>
+    </ul>
+  </nav>
+
+  <main class="gesture-page">
+    <div class="page-header">
+      <h1>Dynamic <span>Gesture Verification</span></h1>
+      <p>Complete the hand gesture challenges to verify your identity. Each instruction is validated in real-time using motion analysis.</p>
+    </div>
+
+    <div class="main-grid">
+      <!-- Left: Camera -->
+      <div>
+        <div class="camera-viewport" id="camera-viewport">
+          <video id="live-video" playsinline muted></video>
+          <canvas id="overlay-canvas"></canvas>
+          <div class="corner-guide tl"></div>
+          <div class="corner-guide tr"></div>
+          <div class="corner-guide bl"></div>
+          <div class="corner-guide br"></div>
+          <div class="fps-badge" id="fps-badge">-- FPS</div>
+          <div class="feedback-overlay" id="feedback-overlay">
+            <div class="msg" id="feedback-msg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Sidebar -->
+      <div class="sidebar">
+        <!-- Instruction Card -->
+        <div class="instruction-card">
+          <div class="challenge-label" id="challenge-label">Initializing...</div>
+          <div class="challenge-instruction" id="challenge-instruction">Loading hand tracking model...</div>
+
+          <!-- Countdown -->
+          <div class="countdown-ring-wrap">
+            <div class="countdown-ring">
+              <svg viewBox="0 0 52 52">
+                <circle class="bg" cx="26" cy="26" r="22"></circle>
+                <circle class="fill" id="countdown-circle" cx="26" cy="26" r="22"
+                        stroke-dasharray="138.23" stroke-dashoffset="0"></circle>
+              </svg>
+              <div class="countdown-text" id="countdown-text">--</div>
+            </div>
+            <div class="countdown-label" id="countdown-label">Time remaining</div>
+          </div>
+
+          <!-- Timer bar -->
+          <div class="timer-bar">
+            <div class="timer-fill" id="timer-fill" style="background: var(--accent-blue);"></div>
+          </div>
+
+          <!-- Live Metrics -->
+          <div class="metrics-grid">
+            <div class="metric-row">
+              <span class="label">Gesture Score</span>
+              <span class="value" id="m-score" style="color:var(--accent-blue);">0%</span>
+              <div class="score-bar-wrap"><div class="score-bar-inner" id="m-score-bar" style="background:var(--accent-blue);"></div></div>
+            </div>
+            <div class="metric-row">
+              <span class="label">Frame Consistency</span>
+              <span class="value" id="m-frames" style="color:var(--accent-cyan);">0 / 10</span>
+            </div>
+            <div class="metric-row">
+              <span class="label">Motion</span>
+              <span class="value" id="m-motion" style="color:var(--accent-green);">Waiting</span>
+            </div>
+            <div class="metric-row">
+              <span class="label">Liveness</span>
+              <span class="value" id="m-liveness" style="color:var(--accent-purple);">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress Dots -->
+        <div style="text-align:center;">
+          <div class="challenge-label" style="margin-bottom:var(--space-sm);">Challenge Progress</div>
+          <div class="progress-track" id="progress-track">
+            <!-- Dots injected by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Result Modal -->
+  <div class="result-backdrop" id="result-backdrop">
+    <div class="result-panel">
+      <div class="result-icon" id="result-icon"><i data-lucide="check" style="width:36px;height:36px;"></i></div>
+      <h2 id="result-title">Authentication Result</h2>
+      <div class="result-stats" id="result-stats"></div>
+      <p id="result-text"></p>
+      <a href="wallet.html" class="btn btn--primary btn--lg" id="result-btn" style="display:none;">Continue to Wallet</a>
+      <button class="btn btn--secondary btn--lg" id="retry-btn" onclick="location.reload()" style="display:none;">Retry</button>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/gesture_auth.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

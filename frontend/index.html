@@ -51,6 +51,7 @@
       <li><a href="wallet.html" class="nav__link">Wallet</a></li>
       <li><a href="consent.html" class="nav__link">Consent</a></li>
       <li><a href="anomaly.html" class="nav__link">Anomaly</a></li>
+      <li><a href="#" class="nav__link" onclick="localStorage.removeItem('trustvault_logged_in');window.location.href='login.html';" style="color:var(--accent-red);">Logout</a></li>
     </ul>
   </nav>
 
@@ -159,6 +160,10 @@
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script src="js/accessibility.js"></script>
-  <script>lucide.createIcons();</script>
+  <script>
+    // Auth guard — redirect to login if not authenticated
+    if (localStorage.getItem('trustvault_logged_in') !== 'true') { window.location.href = 'login.html'; }
+    lucide.createIcons();
+  </script>
 </body>
 </html>

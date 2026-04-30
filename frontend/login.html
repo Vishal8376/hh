@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — TrustVault</title>
+  <meta name="description" content="Securely log in to TrustVault Financial Identity Verification System.">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/login.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <!-- Animated background -->
+  <div class="login-bg-orb login-bg-orb--1"></div>
+  <div class="login-bg-orb login-bg-orb--2"></div>
+  <div class="login-bg-orb login-bg-orb--3"></div>
+  <div class="particles"></div>
+
+  <!-- Toast notification -->
+  <div class="login-toast" id="login-toast"><span id="login-toast-msg"></span></div>
+
+  <div class="login-page">
+    <div class="login-container">
+
+      <!-- Logo -->
+      <div class="login-logo">
+        <div class="login-logo__icon"><i data-lucide="shield-check"></i></div>
+        <div class="login-logo__title">TrustVault</div>
+        <div class="login-logo__sub">Financial Identity Verification System</div>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div class="login-card" id="login-panel">
+        <h1 class="login-card__title">Welcome back</h1>
+        <p class="login-card__sub">Sign in to access your secure dashboard.</p>
+
+        <form id="login-form" onsubmit="handleLogin(event)">
+          <div class="login-field">
+            <label class="login-field__label" for="login-email">Email</label>
+            <div class="login-field__input-wrap">
+              <span class="login-field__icon"><i data-lucide="mail"></i></span>
+              <input class="login-field__input" type="email" id="login-email" placeholder="name@example.com" required autocomplete="email">
+            </div>
+            <div class="login-field__error" id="email-error">Please enter a valid email.</div>
+          </div>
+
+          <div class="login-field">
+            <label class="login-field__label" for="login-password">Password</label>
+            <div class="login-field__input-wrap">
+              <span class="login-field__icon"><i data-lucide="lock"></i></span>
+              <input class="login-field__input" type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+              <button type="button" class="login-field__toggle" id="toggle-password" aria-label="Toggle password visibility">
+                <i data-lucide="eye" id="icon-eye"></i>
+              </button>
+            </div>
+            <div class="login-field__error" id="password-error">Password must be at least 6 characters.</div>
+          </div>
+
+          <div class="login-row">
+            <label class="login-remember">
+              <input type="checkbox" id="remember-me"> Remember me
+            </label>
+            <button type="button" class="login-forgot" onclick="showForgotPassword()">Forgot password?</button>
+          </div>
+
+          <button type="submit" class="login-btn" id="login-btn">
+            <div class="spinner"></div>
+            <span class="login-btn__text">Sign In</span>
+            <i data-lucide="arrow-right" class="login-btn__text" style="width:18px;height:18px;"></i>
+          </button>
+        </form>
+
+        <div class="login-divider">or</div>
+        <p class="login-register">Don't have an account? <a href="#" onclick="handleDemoRegister(event)">Register now</a></p>
+      </div>
+
+      <!-- FORGOT PASSWORD PANEL -->
+      <div class="login-card forgot-panel" id="forgot-panel">
+        <button class="forgot-back" onclick="showLoginPanel()">
+          <i data-lucide="arrow-left"></i> Back to login
+        </button>
+
+        <!-- Step 1: Enter email -->
+        <div id="forgot-step1">
+          <h1 class="login-card__title">Reset password</h1>
+          <p class="login-card__sub">Enter your email and we'll send you a reset link.</p>
+
+          <form onsubmit="handleForgotPassword(event)">
+            <div class="login-field">
+              <label class="login-field__label" for="forgot-email">Email address</label>
+              <div class="login-field__input-wrap">
+                <span class="login-field__icon"><i data-lucide="mail"></i></span>
+                <input class="login-field__input" type="email" id="forgot-email" placeholder="name@example.com" required>
+              </div>
+            </div>
+            <button type="submit" class="login-btn" id="forgot-btn">
+              <div class="spinner"></div>
+              <span class="login-btn__text">Send Reset Link</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Step 2: Success -->
+        <div id="forgot-step2" style="display:none;">
+          <div class="forgot-success">
+            <div class="forgot-success__icon"><i data-lucide="check"></i></div>
+            <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:var(--space-sm);">Check your inbox</h2>
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:var(--space-xl);">
+              We've sent a password reset link to <strong id="forgot-sent-email"></strong>. Check your email and follow the instructions.
+            </p>
+            <button type="button" class="login-btn" onclick="showLoginPanel()" style="background:var(--bg-glass);border:1px solid var(--border-color);">
+              <span class="login-btn__text">Return to Login</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="js/login.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

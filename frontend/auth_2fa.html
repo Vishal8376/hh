@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrustVault — Multi-Factor Authentication</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- Face-API.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script>
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <style>
+    .auth-container { max-width: 800px; margin: var(--space-3xl) auto; padding: var(--space-xl); }
+    .camera-box { position: relative; width: 100%; max-width: 640px; aspect-ratio: 4/3; background: #000; border-radius: var(--radius-lg); overflow: hidden; margin: 0 auto var(--space-xl); border: 1px solid var(--border-color); }
+    #live-video { width: 100%; height: 100%; object-fit: cover; }
+    #live-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .instruction-overlay { position: absolute; top: var(--space-md); left: var(--space-md); right: var(--space-md); background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); padding: var(--space-md); border-radius: var(--radius-md); color: white; text-align: center; font-weight: 600; border: 1px solid rgba(255,255,255,0.1); }
+    .status-badge { position: absolute; bottom: var(--space-md); left: 50%; transform: translateX(-50%); background: var(--bg-glass); padding: 4px 12px; border-radius: var(--radius-full); font-size: 0.75rem; color: var(--text-secondary); }
+    .challenge-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); margin-top: var(--space-xl); }
+    .challenge-card { background: var(--bg-glass); border: 1px solid var(--border-color); padding: var(--space-md); border-radius: var(--radius-md); text-align: center; transition: all 0.3s; opacity: 0.5; }
+    .challenge-card.active { border-color: var(--accent-blue); box-shadow: var(--shadow-glow); opacity: 1; transform: scale(1.05); }
+    .challenge-card.completed { border-color: var(--accent-green); opacity: 0.8; }
+    .challenge-card.completed i { color: var(--accent-green); }
+    .selection-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-top: var(--space-2xl); }
+    .select-card { background: var(--bg-glass); border: 1px solid var(--border-color); padding: var(--space-xl); border-radius: var(--radius-lg); text-align: center; cursor: pointer; transition: all 0.3s; }
+    .select-card:hover { border-color: var(--accent-blue); background: rgba(59,130,246,0.05); }
+    .select-card i { width: 48px; height: 48px; margin-bottom: var(--space-md); }
+  </style>
+</head>
+<body>
+  <div class="particles"></div>
+  
+  <nav class="nav">
+    <a href="index.html" class="nav__brand"><i data-lucide="shield-check"></i> TrustVault</a>
+  </nav>
+
+  <main class="auth-container">
+    <div id="auth-header" style="text-align: center; margin-bottom: var(--space-2xl);">
+      <h1 class="hero__title" style="font-size: 2.5rem;">Multi-Factor <span>Authentication</span></h1>
+      <p class="hero__desc" style="margin: 0 auto;">Verify your identity to access secure credentials.</p>
+    </div>
+
+    <!-- Step 1: Face + Liveness -->
+    <div id="step-primary" class="anim-fade-in">
+      <div class="camera-box">
+        <video id="live-video" playsinline muted></video>
+        <canvas id="live-canvas"></canvas>
+        <div id="instruction" class="instruction-overlay">Position your face in the frame</div>
+        <div id="camera-status" class="status-badge">Initializing Camera...</div>
+      </div>
+      
+      <div class="challenge-cards">
+        <div id="challenge-blink" class="challenge-card">
+          <i data-lucide="eye"></i>
+          <div style="margin-top:8px; font-size:0.9rem;">Blink Twice</div>
+        </div>
+        <div id="challenge-turn" class="challenge-card">
+          <i data-lucide="move-horizontal"></i>
+          <div style="margin-top:8px; font-size:0.9rem;">Turn Head</div>
+        </div>
+        <div id="challenge-smile" class="challenge-card">
+          <i data-lucide="smile"></i>
+          <div style="margin-top:8px; font-size:0.9rem;">Smile</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Factor Selection -->
+    <div id="step-selection" style="display:none;" class="anim-fade-in">
+      <div style="text-align:center; margin-bottom:var(--space-xl);">
+        <h2 style="font-size:1.5rem;">Primary Authentication Passed ✅</h2>
+        <p style="color:var(--text-secondary);">Choose your second factor to complete verification.</p>
+      </div>
+      <div class="selection-grid">
+        <div class="select-card" onclick="startSecondary('gesture')">
+          <i data-lucide="hand"></i>
+          <h3>Hand Gesture</h3>
+          <p style="font-size:0.875rem; color:var(--text-secondary); margin-top:8px;">Visual verification using hand signs</p>
+        </div>
+        <div class="select-card" onclick="startSecondary('voice')">
+          <i data-lucide="mic"></i>
+          <h3>Voice Phrase</h3>
+          <p style="font-size:0.875rem; color:var(--text-secondary); margin-top:8px;">Audio verification (Accessibility Ready)</p>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:var(--space-xl);">
+        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="accessibility-mode" onchange="toggleA11y(this.checked)"> 
+          <span>Enable Voice Guidance (Screen Reader Mode)</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Step 3: Secondary Factor (Gesture/Voice) -->
+    <div id="step-secondary" style="display:none;" class="anim-fade-in">
+      <div class="camera-box" id="secondary-camera-box">
+        <!-- Reused video element or hidden voice UI -->
+        <div id="voice-ui" style="display:none; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--bg-card);">
+           <div id="voice-waves" style="display:flex; gap:4px; height:40px; align-items:center; margin-bottom:var(--space-lg);">
+              <div class="voice-bar" style="width:4px; height:20px; background:var(--accent-blue); border-radius:2px;"></div>
+              <!-- more bars added via JS -->
+           </div>
+           <h3 id="voice-phrase">"My identity is verified"</h3>
+           <p id="voice-status" style="margin-top:var(--space-md); color:var(--text-muted);">Listening...</p>
+        </div>
+      </div>
+      <div id="secondary-instruction" class="instruction-overlay">Initializing...</div>
+    </div>
+
+    <!-- Success Screen -->
+    <div id="step-success" style="display:none; text-align:center;" class="anim-fade-in">
+      <div style="width:80px; height:80px; border-radius:50%; background:var(--gradient-success); display:grid; place-items:center; margin:0 auto var(--space-lg);">
+        <i data-lucide="check" style="color:white; width:40px; height:40px;"></i>
+      </div>
+      <h2 style="font-size:2rem; margin-bottom:var(--space-md);">Identity Authenticated</h2>
+      <p style="color:var(--text-secondary); margin-bottom:var(--space-2xl);">Your 2FA verification was successful. Redirecting to your secure wallet...</p>
+      <a href="wallet.html" class="btn btn--primary btn--lg">Proceed to Wallet</a>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth_2fa.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>
