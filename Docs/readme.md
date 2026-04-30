@@ -132,6 +132,7 @@ OUTPUT: VID, AuthStatus, TxLog
       Log success
    Else:
       Log failure
+```
 
 ## 🧪 Prototype Testing
 
@@ -174,9 +175,6 @@ OUTPUT: VID, AuthStatus, TxLog
 6. Identity matching  
 7. Secure hash generation  
 8. Logging & audit  
-
-<p align="center"> <img src="images/Techstack.png" width="600"/> </p>
-
 
 ---
 
